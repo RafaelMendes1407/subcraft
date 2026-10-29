@@ -1,6 +1,6 @@
 # SubCraft — implementation progress
 
-Last updated: 2026-10-20 (session 94: stable minified PBR viewport textures)
+Last updated: 2026-10-29 (session 103: Layers panel folder hierarchy and generators)
 
 ## Decisions
 
@@ -2751,6 +2751,35 @@ CPU engine tests only: `cargo test -p subcraft-core -p subcraft-image -p subcraf
   materials, New Project, Export).
 * NOT verified: a normal map / brush tip applied by hand, real mouse use of the new Shelf tiles, installer
   size (see release notes), Linux build of the packaging changes.
+
+### Session 103 - Claude: Layers panel folder hierarchy and generators (2026-10-29)
+
+* User request: make folders in the Layers tab more visual, including the hierarchy, and include
+  the generators there.
+* Folders: open/closed folder icon, a badge with the number of layers inside (all descendants,
+  also when collapsed), bold name and a warm row band (`theme::FOLDER`, `FOLDER_BAND`).
+  Hierarchy guides (`theme::TREE_LINE`): each expanded folder draws a vertical line from its
+  caret to its last child, and every child a tick to it; nested folders draw their own.
+* Generators: every layer lists its mask generators as compact rows under it (wand icon, name,
+  eye), top of the stack first. Clicking a row selects the layer's mask and opens the generator
+  in Properties; the eye hides it (one undo step). The selected layer's mask stack shows them
+  itself, so they are not listed twice. A toolbar wand menu adds a generator (Edge wear, Dirt,
+  Directional, Position gradient, Mesh map AO / Curvature / Thickness) to the selected layer —
+  adding a black mask if needed — and opens it; the row context menu uses the same list.
+* Tests (`ui/tests/layer_tree.rs`): folder icon, counts and guide lines (5 for two nested
+  folders, none when collapsed); toolbar menu adds a Cavity generator and opens it; its row
+  under a non-selected layer reselects it on the mask; the row eye hides it with one undo
+  entry. `cargo test -p subcraft-ui` passes.
+* Ran the release build on a project with a smart material and nested folders:
+  `docs/screenshots/layers-folders-generators.png`.
+* Rebased onto `origin/main` (session 102): rows use the new variable `row_height`
+  (thumbnail-sized) for folder rows too; `tree_row` uses the upstream `list_row_sized` argument order.
+* Cavity's label is now "Dirt" upstream, so the test clicks "Generator (Dirt)".
+* Verified after the rebase (2026-10-29): `cargo test --workspace --no-fail-fast` **637 pass, 0
+  failed/ignored**; `cargo build --release` clean. Screenshot regenerated with the 0.1.8 release
+  executable (`--screenshot`) on a cube project with nested folders and Dirt / Edges / Directional
+  generators built through `Session` commands: `docs/screenshots/layers-folders-generators.png`.
+  Not verified: real mouse clicks on the toolbar wand menu (covered by the egui event tests only).
 
 ## Next steps (in order)
 
