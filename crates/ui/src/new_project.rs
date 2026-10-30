@@ -348,7 +348,8 @@ fn create_project(state: &mut UiState, now: f64) {
     let Some(model) = state.new_project.model.take() else { return };
     let settings = state.new_project.settings.clone();
     match subcraft_app::Session::from_mesh_with(model.mesh.clone(), &settings) {
-        Ok(session) => {
+        Ok(mut session) => {
+            session.set_mesh_source(&model.path);
             state.set_session(session);
             state.welcome.remember(&model.path);
             state.recovery.prefs.new_project = NewProjectSettings { high_poly: None, resolution_overrides: Default::default(), ..settings.clone() };

@@ -85,6 +85,14 @@ fn main() -> anyhow::Result<()> {
             }
             "--screenshot" => options.screenshot = args.next().map(Into::into),
             "--recover" => options.recover = true,
+            "--reload-mesh" => options.reload_mesh = Some(args.next().ok_or_else(|| anyhow::anyhow!("--reload-mesh expects a model path"))?.into()),
+            "--reload-mode" => {
+                options.reload_mode = Some(match args.next().as_deref() {
+                    Some("keep") => subcraft_app::ReloadMode::KeepUvs,
+                    Some("reproject") => subcraft_app::ReloadMode::Reproject,
+                    _ => anyhow::bail!("--reload-mode expects keep or reproject"),
+                })
+            }
             "--test-crash" => options.test_crash = true,
             "--profile-edits" => {
                 let out = args.next().ok_or_else(|| anyhow::anyhow!("--profile-edits expects an output file"))?;
