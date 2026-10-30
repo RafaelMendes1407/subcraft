@@ -26,7 +26,8 @@ use uuid::Uuid;
 // 12: Bevel and Mask Outline; schemas 1-11 migrate unchanged (no contour effects to default).
 // 13: UDIM tile per texture set and project settings (export choices, normal format); schemas
 //     1-12 migrate unchanged (no tile, default settings).
-pub const SCHEMA_VERSION: u32 = 13;
+// 14: ID Color Mask effect (`id_color`); schemas 1-13 migrate unchanged (they cannot contain it).
+pub const SCHEMA_VERSION: u32 = 14;
 pub const FORMAT_NAME: &str = "subcraft-project";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -217,6 +218,8 @@ pub enum MaskEffectKindV1 {
     Invert,
     /// Schema 2.
     Image { resource: Uuid, projection: Projection, invert: bool },
+    /// Schema 14 (ADR-0040).
+    IdColor { id_color: subcraft_doc::IdColorMask },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -107,6 +107,8 @@ pub struct UiState {
     pub painting: bool,
     /// Clicks in the 3D view show / hide the selected layer on mesh parts (Properties → Parts).
     pub picking_parts: bool,
+    /// Clicks in the 3D view add the ID map color under the cursor to this ID Color Mask effect.
+    pub picking_id_color: Option<(subcraft_core::LayerId, subcraft_core::EffectId)>,
     pub last_stroke_point: Option<Vec2>,
     pub uv_edges: HashMap<u32, Vec<[Vec2; 2]>>,
     pub rename: Option<(subcraft_core::LayerId, String)>,
@@ -199,6 +201,7 @@ impl UiState {
             uv: UvView { zoom: 1.0, offset: egui::Vec2::ZERO, source: PreviewSource::Channel(ChannelKind::BaseColor), texture: None },
             painting: false,
             picking_parts: false,
+            picking_id_color: None,
             last_stroke_point: None,
             uv_edges: HashMap::new(),
             rename: None,

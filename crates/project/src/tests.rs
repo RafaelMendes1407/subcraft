@@ -391,7 +391,7 @@ fn content_effects_roundtrip_exactly_with_schema_5() {
     let mut json = String::new();
     zip.by_name("document.json").unwrap().read_to_string(&mut json).unwrap();
     assert!(json.contains("\"content_effects\"") && json.contains("\"type\": \"levels\""), "{json}");
-    assert_eq!(SCHEMA_VERSION, 13);
+    assert_eq!(SCHEMA_VERSION, 14);
     assert_eq!(read_project(Cursor::new(bytes)).unwrap().document, doc, "effect ids, order, blends, rasters survive");
 }
 
@@ -487,7 +487,7 @@ fn loader_rejects_filters_with_invalid_domains_or_parameters() {
 #[test]
 fn neighborhood_filters_keep_their_original_json() {
     use subcraft_doc::Filter;
-    assert_eq!(SCHEMA_VERSION,13);
+    assert_eq!(SCHEMA_VERSION,14);
     assert_eq!(serde_json::to_string(&Filter::Blur {radius:4.0}).unwrap(),r#"{"kind":"blur","radius":4.0}"#);
     assert_eq!(serde_json::to_string(&Filter::Sharpen {radius:2.0,amount:1.5}).unwrap(),r#"{"kind":"sharpen","radius":2.0,"amount":1.5}"#);
 }
@@ -524,4 +524,44 @@ fn schema_11_directional_stacks_migrate_and_contours_have_stable_json() {
     assert_eq!(read_project(Cursor::new(old)).unwrap().document,doc);
     assert_eq!(serde_json::to_string(&Filter::Bevel {radius:8.0,amount:-0.2,threshold:0.5}).unwrap(),r#"{"kind":"bevel","radius":8.0,"amount":-0.2,"threshold":0.5}"#);
     assert_eq!(serde_json::to_string(&Filter::MaskOutline {radius:4.0,threshold:0.5,position:OutlinePosition::Outer}).unwrap(),r#"{"kind":"mask_outline","radius":4.0,"threshold":0.5,"position":"outer"}"#);
+}
+
+#[test]
+fn schema_14_id_color_mask_roundtrips_has_stable_json_and_older_projects_migrate() {
+    use subcraft_doc::IdColorMask;
+    let id = IdColorMask { colors: vec![[0.9, 0.3, 0.25], [0.25, 0.5, 0.9]], tolerance: 0.08, softness: 0.02, invert: true };
+    assert_eq!(
+        serde_json::to_string(&MaskEffectKindV1::IdColor { id_color: id.clone() }).unwrap(),
+        r#"{"type":"id_color","id_color":{"colors":[[0.9,0.3,0.25],[0.25,0.5,0.9]],"tolerance":0.08,"softness":0.02,"invert":true}}"#
+    );
+    let mesh = primitives::cube(2.0);
+    let save = |doc: &Document| write_project(Cursor::new(Vec::new()), &mesh, doc, &ResourceStore::default(), &MeshMapSet::new()).unwrap().into_inner();
+    let with_mask = |kind: MaskEffectKind| {
+        let mut ts = TextureSet::new("T", 0, 128);
+        let mut layer = Layer::new_fill("F", &ts);
+        let mut mask = Mask::new(128, false);
+        let mut effect = MaskEffect::new(kind);
+        effect.opacity = 0.75;
+        mask.effects.push(Arc::new(effect));
+        layer.mask = Some(mask);
+        ts.insert_above(None, layer);
+        Document { texture_sets: vec![ts] }
+    };
+    let doc = with_mask(MaskEffectKind::IdColor(id.clone()));
+    assert_eq!(read_project(Cursor::new(save(&doc))).unwrap().document, doc, "colors, tolerance, softness, invert survive");
+
+    // A Smart Mask fragment carries it too.
+    let fragment = crate::fragment::Fragment { kind: crate::fragment::FragmentKind::SmartMask, name: "ID".into(), resolution: 128,
+        layers: vec![], mask_effects: vec![MaskEffect::new(MaskEffectKind::IdColor(id.clone()))], resources: ResourceStore::default() };
+    let bytes = crate::fragment::write_fragment(Cursor::new(Vec::new()), &fragment).unwrap().into_inner();
+    assert_eq!(crate::fragment::read_fragment(Cursor::new(bytes)).unwrap().mask_effects, fragment.mask_effects);
+
+    // Out-of-range parameters are invalid data.
+    let bad = with_mask(MaskEffectKind::IdColor(IdColorMask { tolerance: 3.0, ..id }));
+    assert!(matches!(read_project(Cursor::new(save(&bad))), Err(ProjectError::Invalid(_))));
+
+    // Schema 13 projects (no ID color masks) load unchanged.
+    let old = effect_document();
+    let bytes = with_manifest(save(&old), |m| m.replace(&format!("\"schema_version\": {SCHEMA_VERSION}"), "\"schema_version\": 13"));
+    assert_eq!(read_project(Cursor::new(bytes)).unwrap().document, old);
 }
