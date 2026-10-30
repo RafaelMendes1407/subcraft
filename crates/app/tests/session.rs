@@ -656,3 +656,28 @@ fn save_and_export_use_newest_document_while_worker_is_busy() {
         assert_eq!(s.composite(ts.id), reopened.composite(ts.id));
     }
 }
+
+#[test]
+fn a_radial_symmetry_stroke_is_one_undo_step_that_restores_the_document_exactly() {
+    let mut s = session();
+    let cam = camera();
+    let before = s.document().clone();
+    let entries = s.history().entries().len();
+    let mut options = s.brush.options;
+    options.radial = subcraft_paint::RadialSymmetry { enabled: true, axis: 1, count: 6, ..options.radial };
+    s.execute(Command::SetStrokeOptions(options)).unwrap();
+    let center = cam.project(Vec3::new(0.15, 0.1, 0.5)).unwrap().truncate();
+    s.begin_stroke().unwrap();
+    let mut painted = 0;
+    for k in 0..10 {
+        painted += s.stroke_to(&cam, center + Vec2::new(k as f32 * 6.0, 0.0), false).unwrap().len();
+    }
+    s.end_stroke();
+    assert!(painted > 0);
+    assert_eq!(s.history().entries().len(), entries + 1, "one history entry for all copies");
+    assert_ne!(s.document(), &before);
+    s.perform(Action::Undo).unwrap();
+    assert_eq!(s.document(), &before);
+    s.perform(Action::Redo).unwrap();
+    assert_ne!(s.document(), &before);
+}
