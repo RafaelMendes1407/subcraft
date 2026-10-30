@@ -1,6 +1,6 @@
 # SubCraft — implementation progress
 
-Last updated: 2026-10-20 (session 94: stable minified PBR viewport textures)
+Last updated: 2026-10-29 (session 104: Edit in PhotoCraft)
 
 ## Decisions
 
@@ -2751,6 +2751,41 @@ CPU engine tests only: `cargo test -p subcraft-core -p subcraft-image -p subcraf
   materials, New Project, Export).
 * NOT verified: a normal map / brush tip applied by hand, real mouse use of the new Shelf tiles, installer
   size (see release notes), Linux build of the packaging changes.
+
+### Session 104 - Claude: Edit in PhotoCraft (2026-10-29)
+
+* Owner request: edit the layers in PhotoCraft (sibling ArtCraft image editor) and bring them back.
+  Owner choices: whole layer stack, paint layers only, use the local PhotoCraft checkout.
+  Decision record: ADR-0039.
+* `export::psd`: one 16-bit PSD per channel of the selected texture set through PhotoCraft's own
+  `photocraft-psd` crate (git dependency pinned to `c5352f2`; a local uncommitted
+  `.cargo/config.toml` `[patch]` builds it from `../photocraft`). Folders become groups, paint layers
+  raster layers with their painted mask; fill layers and effects stay out. sRGB for color channels,
+  raw data channels, Height `h * 0.5 + 0.5`. Each record's `lyid` maps back to the layer UUID.
+  The return trip writes only tiles whose hash differs from what was written (color under zero
+  alpha ignored), so untouched texels stay bit-exact; names/visibility apply when changed in the
+  file; unknown raster layers become paint layers above their nearest known neighbor; deletions
+  are reported, not applied; a resized canvas or changed color mode is refused.
+* `app::photocraft::Exchange`: writes the files into a temp session folder, launches PhotoCraft
+  (`SUBCRAFT_PHOTOCRAFT`, `PATH`, or a sibling `photocraft/target/{release,debug}` build), polls
+  file stamps twice a second and applies a save once two checks agree, as one undo step via the new
+  `Command::ReplaceTextureSetLayers` ("Edit in PhotoCraft (<channel>)").
+* `ui`: Layer menu › Edit in PhotoCraft… / Stop editing; Layers panel banner with Stop; status line
+  reports repainted tiles, added layers, renames, kept deletions and errors.
+* Tests: 8 PSD tests (hierarchy and ids, encodings, unedited file is a no-op with bit-exact texels,
+  one edited texel rewrites one tile, transparent recolor ignored, names/visibility/masks, added
+  layer placed and not duplicated on re-save, deletions/resized canvas/wrong mode), 4 app tests
+  (files out, settled save = one undo step and undo, broken file / removed set, no paint layers),
+  1 UI test (banner and Stop). `cargo test --workspace --no-fail-fast` **647 pass, 0 failed**.
+* Real PhotoCraft (local release build of `c5352f2`): `photocraft-cli run <Base Color PSD>
+  --cmd image.adjustments.invert --cmd layer.duplicate --in-place` on an exported cube project; the
+  exchange applied "8 tile(s) repainted, 1 layer(s) added": inverted Top kept its UUID (lyid kept by
+  PhotoCraft), "Top copy" became a paint layer above it, a transparent texel stayed bit-exact; a
+  second save repainted 4 tiles without duplicating the copy. The PhotoCraft GUI opened the exported
+  PSD with both layers (RGB/16): `docs/screenshots/photocraft-roundtrip.png` (via its control
+  channel screenshot). Not verified: clicking the SubCraft menu item in the desktop app (the launch
+  path finder and banner are covered only by code and the headless UI test), PSDs from other
+  editors, 4K stacks' memory/time.
 
 ## Next steps (in order)
 
